@@ -1,0 +1,5 @@
+[tool.pytest.ini_options]
+# Put the project root on sys.path so `import src...` works when
+# running plain `pytest` (the same command CI runs).
+testpaths = ["tests"]
+pythonpath = ["."]

@@ -39,5 +39,8 @@ class MlflowTracker:
         run_id = mlflow.active_run().info.run_id
         return f"runs:/{run_id}/{name}"
 
+    def log_artifact(self, name: str, content: str) -> None:
+        mlflow.log_text(content, artifact_file=name)
+
     def register_model(self, model_uri: str, name: str) -> None:
         mlflow.register_model(model_uri, name)

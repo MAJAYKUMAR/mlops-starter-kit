@@ -45,6 +45,24 @@ def test_evaluate_model_scores_are_reasonable():
     assert 0.8 <= metrics["f1_weighted"] <= 1.0
 
 
+def test_evaluate_model_reports_per_class_and_confusion_matrix():
+    X_train, X_test, y_train, y_test = load_data()
+    model = train_model(X_train, y_train, n_estimators=10)
+    metrics = evaluate_model(model, X_test, y_test)
+
+    # The report is keyed by Iris class name, not just aggregates.
+    report = metrics["classification_report"]
+    assert {"setosa", "versicolor", "virginica"}.issubset(report)
+    for name in ("setosa", "versicolor", "virginica"):
+        assert {"precision", "recall", "f1-score"}.issubset(report[name])
+    assert "setosa" in metrics["classification_report_text"]
+
+    # 3x3 confusion matrix, rows summing to the 30 test rows.
+    cm = metrics["confusion_matrix"]
+    assert len(cm) == 3 and all(len(row) == 3 for row in cm)
+    assert sum(sum(row) for row in cm) == 30
+
+
 class FakeTracker:
     """In-memory stand-in for the TrackingPort (no MLflow needed)."""
 
@@ -52,6 +70,7 @@ class FakeTracker:
         self.experiment = None
         self.params = {}
         self.metrics = {}
+        self.artifacts = {}
         self.logged_model_uri = None
         self.registered = []
 
@@ -72,6 +91,9 @@ class FakeTracker:
         self.logged_model_uri = f"runs:/fake-run/{name}"
         return self.logged_model_uri
 
+    def log_artifact(self, name, content):
+        self.artifacts[name] = content
+
     def register_model(self, model_uri, name):
         self.registered.append((model_uri, name))
 
@@ -83,8 +105,16 @@ def test_training_service_logs_and_registers_without_mlflow():
 
     assert tracker.experiment == "iris-random-forest"
     assert tracker.params["n_estimators"] == 10
+    # Only the two scalar metrics are logged as metrics; the report
+    # and confusion matrix go out as artifacts.
     assert 0.8 <= tracker.metrics["accuracy"] <= 1.0
-    assert metrics == tracker.metrics
+    assert 0.8 <= tracker.metrics["f1_weighted"] <= 1.0
+    assert metrics["accuracy"] == tracker.metrics["accuracy"]
+    assert metrics["f1_weighted"] == tracker.metrics["f1_weighted"]
+    assert "setosa" in tracker.artifacts["classification_report.txt"]
+    assert tracker.artifacts["confusion_matrix.csv"].startswith(
+        "actual\\predicted,setosa,versicolor,virginica\n"
+    )
     assert tracker.registered == [("runs:/fake-run/model", "iris-random-forest")]
 
 

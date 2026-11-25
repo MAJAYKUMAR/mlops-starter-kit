@@ -11,7 +11,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from src.application.ports import TrackingPort
-from src.domain import evaluate_model, load_data, train_model
+from src.domain import (
+    confusion_matrix_to_csv,
+    evaluate_model,
+    load_data,
+    train_model,
+)
 
 EXPERIMENT_NAME = "iris-random-forest"
 MODEL_NAME = "iris-random-forest"
@@ -33,10 +38,14 @@ class TrainingService:
         self.tracker = tracker
         self.config = config or TrainingConfig()
 
-    def run(self) -> dict[str, float]:
+    def run(self) -> dict:
         """Train, evaluate, log everything, register the model.
 
-        Returns the evaluation metrics (accuracy and weighted F1).
+        Returns the full evaluation result: accuracy, weighted F1,
+        the per-class classification report, and the confusion matrix.
+        Only the two scalar metrics go to ``log_metrics``; the report
+        and matrix are logged as text artifacts so they stay readable
+        in the tracking UI.
         """
         cfg = self.config
         self.tracker.set_experiment(cfg.experiment_name)
@@ -53,7 +62,19 @@ class TrainingService:
                     "test_size": cfg.test_size,
                 }
             )
-            self.tracker.log_metrics(metrics)
+            self.tracker.log_metrics(
+                {
+                    "accuracy": metrics["accuracy"],
+                    "f1_weighted": metrics["f1_weighted"],
+                }
+            )
+            self.tracker.log_artifact(
+                "classification_report.txt", metrics["classification_report_text"]
+            )
+            self.tracker.log_artifact(
+                "confusion_matrix.csv",
+                confusion_matrix_to_csv(metrics["confusion_matrix"]),
+            )
             model_uri = self.tracker.log_model(model, name="model")
             self.tracker.register_model(model_uri, cfg.model_name)
 

@@ -34,6 +34,10 @@ class TrackingPort(Protocol):
         """Log a fitted model; return its model URI (e.g. ``runs:/...``)."""
         ...
 
+    def log_artifact(self, name: str, content: str) -> None:
+        """Log a text artifact (e.g. an evaluation report) under ``name``."""
+        ...
+
     def register_model(self, model_uri: str, name: str) -> None:
         """Register a logged model under ``name`` in the model registry."""
         ...

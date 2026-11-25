@@ -25,12 +25,33 @@ cd mlops-starter-kit
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 make train        # trains a RandomForest on Iris, logs to MLflow, registers the model
+make predict      # scores sample rows with the registered model
 make mlflow-ui    # browse runs at http://127.0.0.1:5000
 ```
 
 Training uses a local `mlruns/` directory — no MLflow server required.
 The model is registered in the local MLflow Model Registry under the
 name `iris-random-forest`.
+
+## Predict
+
+Once a model is registered, score rows with it — no retraining needed:
+
+```bash
+make predict
+# [5.1, 3.5, 1.4, 0.2] -> setosa
+# [7.0, 3.2, 4.7, 1.4] -> versicolor
+# [6.3, 3.3, 6.0, 2.5] -> virginica
+
+python -m src.cli.predict_cli --input rows.csv   # score your own rows
+```
+
+`--input` takes a CSV with the four Iris feature columns
+(`sepal length (cm)`, `sepal width (cm)`, `petal length (cm)`,
+`petal width (cm)`). Without it, three built-in sample rows (one per
+class) are scored. The model is loaded from the registry as
+`models:/iris-random-forest/latest` by default; pass `--model` to load
+a different version.
 
 ## Repo layout
 
@@ -47,10 +68,12 @@ name `iris-random-forest`.
 │   ├── infrastructure/     # adapters: every MLflow call lives here
 │   │   └── mlflow_tracker.py    # MlflowTracker: TrackingPort via MLflow
 │   ├── cli/                # entry points
-│   │   └── train_cli.py    # `python -m src.cli.train_cli` (also: make train)
+│   │   ├── train_cli.py    # `python -m src.cli.train_cli` (also: make train)
+│   │   └── predict_cli.py  # `python -m src.cli.predict_cli` (also: make predict)
 │   └── train.py            # backwards-compatible alias for `python -m src.train`
 ├── tests/
-│   └── test_train.py       # pytest tests: domain helpers + training service
+│   ├── test_train.py       # pytest tests: domain helpers + training service
+│   └── test_predict.py     # pytest tests: predict CLI (no MLflow needed)
 ├── .github/workflows/
 │   └── ci.yml              # GitHub Actions CI: lint + tests on push/PR
 ├── charts/ml-service/      # Helm chart skeleton for a model-serving container
@@ -61,7 +84,7 @@ name `iris-random-forest`.
 │   ├── main.tf
 │   ├── variables.tf
 │   └── outputs.tf
-├── Makefile                # make train / make mlflow-ui / make lint / make test
+├── Makefile                # make train / make predict / make mlflow-ui / make lint / make test
 ├── pyproject.toml          # pytest config (project root on sys.path)
 ├── requirements.txt        # runtime deps: scikit-learn, mlflow, pandas
 └── requirements-dev.txt    # dev deps: pytest, ruff
